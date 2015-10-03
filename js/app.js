@@ -77,9 +77,6 @@
          .addTo(Map)
          .on('done', function(layer) {
            POC.createSelector(layer.getSubLayer(1));
-          //  for(var i=0; i<layer.layers.length; i++){
-          //    POC.createSelector(layer.getSubLayer(i));
-          //  }
          })
          .on('error', function(err) {
           alert("some error occurred: " + err);
@@ -88,17 +85,23 @@
        createSelector: function(layer) {
         var cartocss = "";
         var $options = $(".layer_selector").find("li");
+
         $options.click(function(e) {
             var $li = $(e.target);
+            var type = $li.data('type');
             var selected = $li.attr('data');
-            console.log(selected);
+
+            console.log(type);
 
             $options.removeClass('cartocss_selected');
             $li.addClass('cartocss_selected');
 
-            cartocss = Style[selected];
-
-            layer.setCartoCSS(cartocss);
+            if (type=="cartocss"){
+              cartocss = Style[selected];
+              layer.setCartoCSS(cartocss);
+            }else{
+              layer.setSQL("SELECT * FROM new_orders WHERE " + selected);
+            }
         });
        }
    }//end of POC
