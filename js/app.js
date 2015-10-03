@@ -1,5 +1,26 @@
-$(function(){
+(function(Style){
     var Map = null;
+
+    var Config = {
+	     user_name: 'byrenx',
+    }
+
+
+    var defaultLayer = {
+	     user_name: Config.user_name,
+	     type: 'cartodb',
+	     sublayers: [{
+              		  sql: "SELECT * FROM stores",
+              		  cartocss: '#stores {marker-fill: #FF0000; marker-opacity: 0.5; marker-width: 50; marker-height: 50}'
+          	       },
+                   {
+            	    	sql: "SELECT * FROM new_orders",
+            	    	cartocss: Style.by_age_style
+  	               }
+  	              ]
+    };
+
+
 
     var Marker = {
         markers: [],
@@ -39,30 +60,48 @@ $(function(){
             this.markers = [];
         }
     };
-    
+
     var POC = {
-	init : function(){
-	    Map = new google.maps.Map(document.getElementById('map'),{
-		zoom: 8,
-		center: {lat:47.29413372501023,
-			 lng:-112.32421875
-			}
-	    });
-	    
-	    // cartodb.createLayer(Map, 'https://byrenx.cartodb.com/api/v2/viz/6f68d37c-6900-11e5-ad84-0ecd1babdde5/viz.json')
-	    // 	.addTo(Map)
-	    // 	.on('done', function(layer) {
-	    // 	    //do stuff
-	    // 	})
-	    // 	.on('error', function(err) {
-	    // 	    alert("some error occurred: " + err);
-	    // 	});
-	}
+       layers: [],
+       init : function(){
+        Map = new google.maps.Map(document.getElementById('map'),{
+                zoom: 8,
+        		    center: {lat:47.29413372501023,
+        			           lng:-112.32421875
+        			  }
+        });
+        this.initLayers();
+       },
+       initLayers: function(){
+         cartodb.createLayer(Map, defaultLayer)
+         .addTo(Map)
+         .on('done', function(layer) {
+           POC.createSelector(layer.getSubLayer(1));
+          //  for(var i=0; i<layer.layers.length; i++){
+          //    POC.createSelector(layer.getSubLayer(i));
+          //  }
+         })
+         .on('error', function(err) {
+          alert("some error occurred: " + err);
+         });
+       },
+       createSelector: function(layer) {
+        var cartocss = "";
+        var $options = $(".layer_selector").find("li");
+        $options.click(function(e) {
+            var $li = $(e.target);
+            var selected = $li.attr('data');
+            console.log(selected);
 
-	initializePolygon: function(){
-	    
-	}
-    }
+            $options.removeClass('cartocss_selected');
+            $li.addClass('cartocss_selected');
+
+            cartocss = Style[selected];
+
+            layer.setCartoCSS(cartocss);
+        });
+       }
+   }//end of POC
+
     POC.init();
-});
-
+})(Style);
