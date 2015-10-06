@@ -1,6 +1,6 @@
 (function(Style){
     var Map = null;
-
+    
     var Config = {
 	    account: 'byrenx',
         KEY: 'b5d8421cb6b5e43f2eedb00de552f7e639b2a5dd',
@@ -30,152 +30,12 @@
     };
 
 
-    var Util = {
-        queryString: function() {
-            var query_string = {};
-            var query = window.location.search.substring(1);
-            var vars = query.split("&");
-            for (var i = 0; i < vars.length; i++) {
-                var pair = vars[i].split("=");
-                if (typeof query_string[pair[0]] === "undefined") {
-                    query_string[pair[0]] = decodeURIComponent(pair[1]);
-                } else if (typeof query_string[pair[0]] === "string") {
-                    var arr = [query_string[pair[0]], decodeURIComponent(pair[1])];
-                    query_string[pair[0]] = arr;
-                } else {
-                    query_string[pair[0]].push(decodeURIComponent(pair[1]));
-                }
-            }
-            return query_string;
-        }(),
-        format: function(template, data) {
-            return template.replace(/{(\w*)}/g, function(m, key) {
-                return data.hasOwnProperty(key) ? data[key] : "";
-            }).replace(/{/g, "").replace(/}/g, "");
-        },
-        executeSQL: function(sql, params) {
-            console.log('Query ==> ', sql);
-            var sqlObj = new cartodb.SQL({
-                user: Config.account,
-                api_key: Config.KEY
-            });
-            return sqlObj.execute(sql, params);
-        },
-        permalink: function() {
-            var z = map.getZoom();
-            var lat = map.getCenter().lat();
-            var lng = map.getCenter().lng();
-            return window.location.pathname.split('/').pop() + this.format("?z={{z}}&lat={{lat}}&lng={{lng}}", {z:z, lat: lat, lng: lng});
-        }
-    };
-
-
-    var UtilSQL ={
-        pointDataToSQL: function(data) {
-            /**
-               data are list of point markers
-            */
-            var lines = "";
-            for (var i = 0; i < data.features.length; i++) {
-                var feature = data.features[i];
-                var coord = feature.geometry.coordinates;
-
-                lines = lines + "SELECT ST_TRANSFORM(ST_GEOMFROMTEXT('POINT(" + coord[0] + " " + coord[1] + ")', 4326), 3857) as the_geom_webmercator " +
-                    (i === (data.features.length - 1) ? "" : " UNION ALL ");
-            }
-
-            var sql = "SELECT * FROM (" + lines + ") as FOO";
-
-            return sql;
-
-        },
-        queryPointsCount: function(points_data, club) {
-            var points_sql = this.pointDataToSQL(points_data);
-            var sql = " SELECT * FROM (                                                    " +
-                " SELECT a.gridcode,                                                 " +
-                "        (                                                           " +
-                "            SELECT COUNT(*) FROM ( " + points_sql + " ) as b WHERE   " +
-                "            ST_INTERSECTS(a.the_geom_webmercator,                   " +
-                "                          b.the_geom_webmercator)                   " +
-                "        ) AS points_count                                            " +
-                " FROM " + club + " AS a                                             " +
-                " ) AS T WHERE NOT (points_count = 0) ";
-
-            
-            return Util.executeSQL(sql);
-        }
-    }
-
-    var Marker = {
-        markers: [],
-        init: function(){
-            this.markers = [];
-        },
-        add: function(feature){
-            var coord = feature.geometry.coordinates;
-            var marker = new google.maps.Marker({
-                map: Map,
-                icon: feature.icon,
-            });
-
-            marker.setPosition({
-                lat: parseFloat(coord[1]),
-                lng: parseFloat(coord[0])
-            });
-            //this.addInfoWindow(marker, feature.message);
-            this.markers.push(marker);
-        },
-        addInfoWindow: function(marker, message){
-            var infoWindow = new google.maps.InfoWindow({
-                content: message
-            });
-
-            google.maps.event.addListener(marker, 'click', function() {
-                infoWindow.open(map, marker);
-            });
-        },
-        list: function(){
-            return markers;
-        },
-        clear: function(){
-            for (var i=0; i<this.markers.length; i++){
-                this.markers[i].setMap(null);
-            }
-            this.markers = [];
-        }
-    };
-
-    var Polygon = {
-        polygons: {},
-        add: function(key, coordinates){
-            var points = [];
-            for (var i = 0; i < coordinates.length; i++) {
-                var coord = coordinates[i];
-                points.push({
-                    lat: coord[1],
-                    lng: coord[0]
-                });
-            }
-
-            this.polygons[key] = new google.maps.Polygon({
-                paths: points,
-                strokeColor: Config.COLORS.red,
-                strokeOpacity: 0.8,
-                strokeWeight: 1
-            });
-            this.polygons[key].setMap(Map);
-        },
-        get: function(key){
-            return this.polygons[key];
-        },
-        all: function(){
-            return this.polygons;
-        }
-    };
-
     var POC = {
 	    layers: [],
-        points_data: [],
+        //points_data: [],
+        Marker: null,
+        Polygon: null,
+        Util: new Util(Config),
 	    init : function(){
             Map = new google.maps.Map(document.getElementById('map'),{
                 zoom: 13,
@@ -183,6 +43,8 @@
         		         lng:-104.99093055725098
         		        }
             });
+            this.Polygon = new Polygon(Map);
+            
             this.initLayers();
             this.initializePolygons();
             this.initializePoints();
@@ -196,13 +58,13 @@
                 .done(function(data) {
                     console.log(data);
                     $.each(data.features, function(key, feature) {
-                        Polygon.add(feature.properties.gridcode, feature.geometry.coordinates[0][0]);
+                        POC.Polygon.add(feature.properties.gridcode, feature.geometry.coordinates[0][0]);
                     });
                 });
         },
 
         updatePolygon: function(){
-            UtilSQL.queryPointsCount(this.points_data, 'colorado_1')
+            this.Util.queryPointsCount(this.points_data, 'colorado_1')
                 .done(function(data){
                     console.log("Points Count ==> ", data);
                     POC.colorizePolygons(data);
@@ -213,7 +75,8 @@
             var active_gridcodes = [];
             for(var i=0; i<data.rows.length; i++){
                 var row = data.rows[i];
-                var poly = Polygon.get(row.gridcode);
+                var poly = this.Polygon.get(row.gridcode);
+                console.log(poly);
 
                 if(row.points_count <= 10){
                     poly.setOptions({
@@ -237,7 +100,7 @@
             this.resetInactivePolygonColor(active_gridcodes);
         },
         resetInactivePolygonColor: function(active_gridcodes) {
-            $.each(Polygon.all(), function(key, val) {
+            $.each(this.Polygon.all(), function(key, val) {
                 var index = active_gridcodes.indexOf(key);
                 if (index < 0) { //reset color
                     val.setOptions({
@@ -278,7 +141,6 @@
                     console.log("Points==>", POC.points_data);
                     // $.each(data.features, function(key, feature) {
                     //     //Marker.add(feature);
-                    
                     // });
                     POC.updatePolygon();
                     POC.updateSubLayer(query, POC.layers[1]);
