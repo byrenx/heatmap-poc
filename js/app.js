@@ -24,7 +24,7 @@
                 cartocss: '#stores {marker-fill: #FF0000; marker-opacity: 0.5; marker-width: 50; marker-height: 50}'},
 		    {
             	sql: "SELECT * FROM "+Config.ORDERS_TABLE,
-            	cartocss: Style.by_age_style
+            	cartocss: Style.simple
   		    }
   	    ]
     };
@@ -247,7 +247,7 @@
             });
         },
         initializePoints: function(){
-            var offset = {start: 0, end: 500};
+            var offset = {start: 0, end: 100};
             var length = 5;
             var gap = 25;
 
@@ -265,7 +265,7 @@
             }
 
             simulate();
-            //setInterval(simulate, Config.INTERVAL);
+            setInterval(simulate, Config.INTERVAL);
         },
         getPoints: function(offset){
             var query = "SELECT * FROM "+Config.ORDERS_TABLE+" LIMIT "+offset.end+" OFFSET "+offset.start;
@@ -293,7 +293,7 @@
                         POC.layers.push(layer.getSubLayer(i));
                         console.log("SubLayer==>", POC.layers[i]);
                     }
-		            //POC.createSelector(layer.getSubLayer(1));
+		            POC.createSelector(layer.getSubLayer(1));
 		        })
 		        .on('error', function(err) {
 		            alert("some error occurred: " + err);
